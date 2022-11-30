@@ -1,0 +1,119 @@
+///**
+// *
+// */
+//package src.main.gov.va.vha09.grecc.raptat.rn.uima.analysisengines;
+//
+//import java.util.ArrayList;
+//import java.util.List;
+//import org.apache.uima.UimaContext;
+//import org.apache.uima.analysis_component.AnalysisComponent;
+//import org.apache.uima.analysis_component.JCasAnnotator_ImplBase;
+//import org.apache.uima.analysis_engine.AnalysisEngineProcessException;
+//import org.apache.uima.cas.FSIterator;
+//import org.apache.uima.cas.FeatureStructure;
+//import org.apache.uima.jcas.JCas;
+//import org.apache.uima.jcas.cas.FSArray;
+//import org.apache.uima.jcas.tcas.Annotation;
+//import org.apache.uima.resource.ResourceAccessException;
+//import org.apache.uima.resource.ResourceInitializationException;
+//import src.main.gov.va.vha09.grecc.raptat.gg.algorithms.probabilistic.sequenceidentification.SequenceIDEvaluator;
+//import src.main.gov.va.vha09.grecc.raptat.gg.algorithms.probabilistic.sequenceidentification.naivebayes.BOWSequenceIDEvaluator;
+//import src.main.gov.va.vha09.grecc.raptat.gg.algorithms.probabilistic.sequenceidentification.naivebayes.BOWSequenceIDSolution;
+//import src.main.gov.va.vha09.grecc.raptat.gg.algorithms.probabilistic.sequenceidentification.probabilistic.ProbabilisticSequenceIDEvaluator;
+//import src.main.gov.va.vha09.grecc.raptat.gg.algorithms.probabilistic.sequenceidentification.probabilistic.ProbabilisticTSFinderSolution;
+//import src.main.gov.va.vha09.grecc.raptat.gg.algorithms.probabilistic.sequenceidentification.probabilistic.ReverseProbabilisticSequenceIDEvaluator;
+//import src.main.gov.va.vha09.grecc.raptat.gg.algorithms.solutions.RaptatAnnotationSolution;
+//import src.main.gov.va.vha09.grecc.raptat.gg.datastructures.SequenceIDStructure;
+//import src.main.gov.va.vha09.grecc.raptat.gg.datastructures.annotationcomponents.RaptatToken;
+//import src.main.gov.va.vha09.grecc.raptat.gg.datastructures.hashtrees.LabeledHashTree;
+//import src.main.gov.va.vha09.grecc.raptat.rn.uima.annotation_types.UIMASentence;
+//import src.main.gov.va.vha09.grecc.raptat.rn.uima.annotation_types.UIMAToken;
+//import src.main.gov.va.vha09.grecc.raptat.rn.uima.makers.UIMAAnnotatedPhraseMaker;
+//
+///********************************************************
+// *
+// *
+// * @author Glenn Gobbel - Aug 26, 2013
+// *******************************************************/
+//public class UIMAPhraseFinder extends JCasAnnotator_ImplBase {
+//  private final static UIMAAnnotatedPhraseMaker phraseMaker = new UIMAAnnotatedPhraseMaker();
+//  private static final double THRESHOLD = 0.35;
+//  private static boolean invertTokenSequence;
+//  private SequenceIDEvaluator tsEvaluator = null;
+//
+//
+//  /**********************************************
+//   *
+//   *
+//   * @author Glenn Gobbel - Aug 26, 2013
+//   **********************************************/
+//  public UIMAPhraseFinder() {
+//    // TODO Auto-generated constructor stub
+//  }
+//
+//
+//  /**
+//   * @see AnalysisComponent#initialize(UimaContext)
+//   */
+//  @Override
+//  public void initialize(UimaContext aContext) throws ResourceInitializationException {
+//    super.initialize(aContext);
+//
+//    try {
+//      //ProbabilisticTSFinderSolution theSolution = (ProbabilisticTSFinderSolution) getContext().getResourceObject("Solution");
+//      RaptatAnnotationSolution raptatSolution = (RaptatAnnotationSolution) getContext().getResourceObject("Solution");
+//      ProbabilisticTSFinderSolution theSolution = (ProbabilisticTSFinderSolution) raptatSolution.getTokenSequenceFinderSolution();
+//      SequenceIDStructure sequenceIdentifier = theSolution.getSequenceIdentifier();
+//      invertTokenSequence = theSolution.getTokenTrainingOptions().invertTokenSequence();
+//
+//      if (sequenceIdentifier instanceof BOWSequenceIDSolution) {
+//        this.tsEvaluator = new BOWSequenceIDEvaluator((BOWSequenceIDSolution) sequenceIdentifier);
+//      } else if (sequenceIdentifier instanceof LabeledHashTree) {
+//        if (invertTokenSequence) {
+//          this.tsEvaluator = new ReverseProbabilisticSequenceIDEvaluator(
+//              (LabeledHashTree) sequenceIdentifier, THRESHOLD);
+//        } else {
+//          this.tsEvaluator =
+//              new ProbabilisticSequenceIDEvaluator((LabeledHashTree) sequenceIdentifier, THRESHOLD);
+//        }
+//      }
+//    } catch (ResourceAccessException e) {
+//      throw new ResourceInitializationException(e);
+//    }
+//  }
+//
+//
+//  @Override
+//  public void process(JCas inputJCas) throws AnalysisEngineProcessException {
+//    FSIterator<Annotation> sentenceIterator =
+//        inputJCas.getAnnotationIndex(UIMASentence.type).iterator();
+//    while (sentenceIterator.hasNext()) {
+//      UIMASentence curSentence = (UIMASentence) sentenceIterator.next();
+//      FSArray tokenArray = curSentence.getSentenceTokens();
+//      int arraySize = tokenArray.size();
+//      List<RaptatToken> tokenList = new ArrayList<>(arraySize);
+//      for (int i = 0; i < arraySize; i++) {
+//        UIMAToken uimaToken = (UIMAToken) tokenArray.get(i);
+//        tokenList.add(new RaptatToken(uimaToken.getTokenStringAugmented(), uimaToken.getBegin(),
+//            uimaToken.getEnd()));
+//      }
+//
+//      List<List<RaptatToken>> sentenceAnnotations =
+//          this.tsEvaluator.getSentenceAnnotations(tokenList);
+//
+//      if (!sentenceAnnotations.isEmpty()) {
+//        FeatureStructure[] annotationArray = new FeatureStructure[sentenceAnnotations.size()];
+//        int i = 0;
+//        for (List<RaptatToken> curAnnotation : sentenceAnnotations) {
+//          annotationArray[i++] = phraseMaker.newAnnotation(inputJCas, curAnnotation);
+//        }
+//        FSArray theAnnotations = new FSArray(inputJCas, annotationArray.length);
+//        theAnnotations.copyFromArray(annotationArray, 0, 0, annotationArray.length);
+//        curSentence.setPhraseAnnotations(theAnnotations);
+//        curSentence.setContainsAnnotatedPhrase(true);
+//      }
+//
+//    }
+//
+//  }
+//}

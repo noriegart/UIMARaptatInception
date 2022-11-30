@@ -1,0 +1,217 @@
+package src.main.gov.va.vha09.grecc.raptat.rn.uima.core;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintStream;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.List;
+import java.util.Properties;
+
+import javax.swing.SwingUtilities;
+import org.apache.log4j.Logger;
+import org.apache.uima.UIMAFramework;
+import org.apache.uima.analysis_engine.AnalysisEngine;
+import org.apache.uima.analysis_engine.AnalysisEngineProcessException;
+import org.apache.uima.cas.CAS;
+import org.apache.uima.collection.CollectionReaderDescription;
+import org.apache.uima.resource.ExternalResourceDescription;
+import org.apache.uima.resource.ResourceInitializationException;
+import org.apache.uima.resource.ResourceSpecifier;
+import org.apache.uima.resource.metadata.ConfigurationParameterSettings;
+import org.apache.uima.resource.metadata.impl.ResourceManagerConfiguration_impl;
+import org.apache.uima.util.InvalidXMLException;
+import org.apache.uima.util.XMLInputSource;
+import src.main.gov.va.vha09.grecc.raptat.gg.core.UserPreferences;
+import src.main.gov.va.vha09.grecc.raptat.gg.helpers.GeneralHelper;
+import src.main.gov.va.vha09.grecc.raptat.rn.uima.cpe.FileSystemCollectionReader;
+import src.main.gov.va.vha09.grecc.raptat.rn.misc.BridgeClass;
+
+/********************************************************
+ *
+ *
+ * @author Glenn Gobbel - Aug 24, 2013
+ *******************************************************/
+public class UIMARaptat {
+
+	//private static final String TEXT_READER_DESC = "/trunk/src/main/resources/desc/TextCollectionReaderDescriptor.xml";
+	private static final String TEXT_READER_DESC = "/TextCollectionReaderDescriptor.xml";
+
+	//private static final String AGGREGATE_ENGINE_DESC = "/trunk/src/main/resources/desc/UIMAAggregateAnnotator.xml";
+	private static final String AGGREGATE_ENGINE_DESC = "/UIMAAggregateAnnotator.xml";
+
+	private static Logger logger = Logger.getLogger(UIMARaptat.class);
+
+
+	/**********************************************
+	 *
+	 *
+	 * @author Glenn Gobbel - Aug 24, 2013
+	 **********************************************/
+	public UIMARaptat() {
+		// initializeUserPreferences() returns 1 if the chosen directory is
+		// good, 0 if user cancels prompt to get LVG directory, and -1 if
+		// they put in an LVG directory that doesn't work
+		int lvgSetting = UserPreferences.INSTANCE.initializeLVGLocation();
+
+		if (lvgSetting == 0) {
+			GeneralHelper.errorWriter("Please install the 2012 Lexical Variant"
+					+ " Generator (LVG) from the U.S. National Library of Medicine before running RapTAT");
+			System.exit(-1);
+		}
+	}
+
+
+	/*************************************************************
+	 * Sets directory containing text files to analysis to the first argument in the @param inputArgs
+	 * array (if there is such an argument). If no argument exists, then the method looks in the
+	 * FileSystemCollectionReader descriptor for the directory. If it is present, it uses that, if
+	 * not, it asks for the user to identify the directory.
+	 *
+	 * @param cpeSettings
+	 * @return
+	 *
+	 * @author Glenn Gobbel - Aug 24, 2013
+	 *************************************************************/
+	private boolean setTextDirectory(String[] inputArgs, CollectionReaderDescription cpeDesc) {
+		ConfigurationParameterSettings cpeSettings =
+				cpeDesc.getCollectionReaderMetaData().getConfigurationParameterSettings();
+
+		if (inputArgs.length > 0 && inputArgs[0].length() > 0) {
+			if (cpeSettings.isModifiable()) {
+				cpeSettings.setParameterValue(FileSystemCollectionReader.PARAM_INPUTDIR, inputArgs[0]);
+				return true;
+			}
+			return false;
+		}
+
+		cpeSettings.setParameterValue(FileSystemCollectionReader.PARAM_INPUTDIR, " ");
+		String inputDir = (String) cpeSettings.getParameterValue(FileSystemCollectionReader.PARAM_INPUTDIR);
+		if (inputDir == null || inputDir.length() == 0) {
+			if (cpeSettings.isModifiable()) {
+				//inputDir = "C:\\Projects\\SVN_Projects\\InceptionSVN\\Inception\\InceptionFiles\\inception-Branch_inception-app-0.17.1\\inception-app-webapp\\repository\\project";
+				inputDir = "C:\\Users\\noriegrt\\Documents\\ADHAF_UIMA_TEXTS";
+				//TODO: try using one of the services to retrieve document text instead
+				inputDir = "C:\\Projects\\SVN_Projects\\InceptionSVN\\Inception\\InceptionFiles\\inception-Branch_inception-app-0.17.1\\inception-app-webapp\\repository\\project";
+				if (inputDir != null & inputDir.length() > 0) {
+					cpeSettings.setParameterValue(FileSystemCollectionReader.PARAM_INPUTDIR, inputDir);
+					cpeSettings.setParameterValue(FileSystemCollectionReader.PARAM_SUBDIR, true);
+					return true;
+				}
+			}
+			return false;
+		}
+		return true;
+	}
+
+
+	/*************************************************************
+	 * @param args
+	 *
+	 * @author Glenn Gobbel - Aug 24, 2013
+	 *************************************************************/
+	public static void main(final String[] args) {
+		SwingUtilities.invokeLater(new Runnable() {
+			@Override
+			public void run() {
+				runRaptat(args, null);
+			}
+		});
+	}
+
+
+	/*************************************************************
+	 * @param args
+	 *
+	 * @author Glenn Gobbel - Aug 24, 2013
+	 *************************************************************/
+	public static void runRaptat(final String[] args, CAS silkCAS) {
+		UIMARaptat raptatInstance = new UIMARaptat();
+		String relativePathToDescriptors = BridgeClass.userDirPath + "/uimaRaptatInception/" + "/descrTemp/";
+		//relativePathToDescriptors = new File(".").getCanonicalPath();
+		//relativePathToDescriptors = "C:/Projects/SVN_Projects/UIMARaptat/trunk/src/main/resources/desc";
+		//writeDescriptorFileFromJar();
+
+		try {
+			URL readerURL = new File(relativePathToDescriptors + TEXT_READER_DESC).toURI().toURL();
+			CollectionReaderDescription cpeDesc = UIMAFramework.getXMLParser()
+					.parseCollectionReaderDescription(new XMLInputSource(readerURL));
+
+			if (raptatInstance.setTextDirectory(args, cpeDesc)) {
+				// instantiate CPE
+
+				URL aeURL = new File(relativePathToDescriptors + AGGREGATE_ENGINE_DESC).toURI().toURL();
+				ResourceSpecifier aeSpecifier =
+						UIMAFramework.getXMLParser().parseResourceSpecifier(new XMLInputSource(aeURL));
+				
+				/**
+				 * Richard Noriega 1-4-22
+				 * Retrieves and sets location of solution file location to one relative to user. In the aggregate XML there
+				 * is only one external resource (the solution file), so we just need to get the first element of the array.
+				 * BridgeClass is a class of fields that are able to be accessed by both RapTat and Inception
+				 */
+				
+				ResourceManagerConfiguration_impl xmlAttributeForSolnFileURL = (ResourceManagerConfiguration_impl) aeSpecifier.getAttributeValue("resourceManagerConfiguration");
+				ExternalResourceDescription solnFileElement = xmlAttributeForSolnFileURL.getExternalResources()[0];
+				solnFileElement.getResourceSpecifier().setAttributeValue("fileUrl", BridgeClass.solutionFilePath);
+				System.out.println(solnFileElement.getResourceSpecifier().getAttributeValue("fileUrl"));
+
+				AnalysisEngine aggregateAnnotator = UIMAFramework.produceAnalysisEngine(aeSpecifier);
+				CAS aCas = aggregateAnnotator.newCAS();
+				aCas.setDocumentText(silkCAS.getDocumentText());
+				try {
+					aggregateAnnotator.process(aCas);
+				}
+				 catch (AnalysisEngineProcessException e) {
+					e.printStackTrace();
+				}
+				aggregateAnnotator.destroy();
+			}
+
+		}
+
+		catch (IOException e) {
+			System.out.println(e);
+			e.printStackTrace();
+		} catch (InvalidXMLException e) {
+			System.out.println(e);
+			e.printStackTrace();
+		} catch (ResourceInitializationException e) {
+			System.out.println(e);
+			e.printStackTrace();}
+	}
+	
+	public static void writeDescriptorFileFromJar() {
+		File descrFileDirectoryTemp = new File(BridgeClass.userDirPath + "/uimaRaptatInception/" + "/descrTemp/");
+		if (!descrFileDirectoryTemp.exists())
+			descrFileDirectoryTemp.mkdir();
+		String[] descrFileNames = {"ConceptMapperDescriptor.xml", "PhraseFinderDescriptor.xml", "ResultWriterDescriptor.xml","ResultWriterDescriptor.xml"
+				,"SourceDocumentInformation.xml", "TextAnalysisEngineDescriptor.xml", "TextCollectionReaderDescriptor.xml"
+				,"UIMAAggregateAnnotator.xml", "UIMAAnnotatedPhraseDescriptor.xml", "UIMASentenceDescriptor.xml", "UIMATokenDescriptor.xml"};
+		for (String descrFileName: descrFileNames) {
+			InputStream descrFileStream = UIMARaptat.class.getClassLoader().getResourceAsStream("src/main/resources/desc/" + descrFileName);
+			byte[] descrFileByteArray;
+			try {
+				descrFileByteArray = descrFileStream.readAllBytes();
+				File descrFileTemp = new File(descrFileDirectoryTemp.getAbsolutePath() + "/" + descrFileName);
+				if (!descrFileTemp.exists())
+					descrFileTemp.delete();
+				descrFileTemp.createNewFile();
+				FileOutputStream fileOutputStreamDescriptor = new FileOutputStream(descrFileTemp.getAbsolutePath());
+				fileOutputStreamDescriptor.write(descrFileByteArray);
+				fileOutputStreamDescriptor.flush();
+				fileOutputStreamDescriptor.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		
+	}
+	
+	
+}
