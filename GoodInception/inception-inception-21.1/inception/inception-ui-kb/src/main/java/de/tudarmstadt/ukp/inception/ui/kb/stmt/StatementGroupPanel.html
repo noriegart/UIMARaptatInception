@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<!--
+  Licensed to the Technische Universität Darmstadt under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The Technische Universität Darmstadt 
+  licenses this file to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.
+   
+  http://www.apache.org/licenses/LICENSE-2.0
+  
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<html xmlns:wicket="http://wicket.apache.org">
+<body>
+  <wicket:panel>
+    <wicket:container wicket:id="content" />
+  </wicket:panel>
+  
+  <wicket:fragment wicket:id="newStatementGroup">
+    <form wicket:id="form" class="statement-group flex-h-container">
+      <div class="input-group">
+        <select wicket:id="property" class="form-select flex-content" data-container="body"/>
+        <a wicket:id="create" wicket:message="title:statement.save" class="btn btn-primary">
+          <i class="fas fa-check"></i>
+        </a>
+        <a wicket:id="cancel" wicket:message="title:cancel" class="btn btn-secondary">
+          <i class="fas fa-times"></i>
+        </a>
+      </div>
+      <div class="flex-content statement-group-footer">
+      </div>
+    </form>
+  </wicket:fragment>
+  
+  <wicket:fragment wicket:id="existingStatementGroup">
+    <form wicket:id="form" class="card statement-group flex-h-container">
+      <div class="flex-25">
+        <span class="statement-group-property">
+          <span wicket:id="statementIdtext"/>
+          <a wicket:id="propertyLink"><wicket:container wicket:id="property"></wicket:container></a>
+        </span>
+      </div>
+      <div class="statement-group-statements-list flex-v-container flex-content">
+        <div wicket:id="statementListWrapper" class="flex-v-container flex-content flex-gutter flex-only-initial-gutter">
+          <div wicket:id="statementList" class="statement-group-statement-wrapper">
+            <div class="statement-editor" wicket:id="statement"></div>
+          </div>
+        </div>
+        <div wicket:id="statementGroupFooter" class="rounded statement-group-footer">
+          <button wicket:id="add" type="button" class="btn btn-sm btn-primary float-end">
+            <i class="fas fa-plus me-1"></i>
+            <wicket:container wicket:id="label"/>
+          </button>
+        </div>
+      </div>
+    </form>
+  </wicket:fragment>
+</body>
+</html>

@@ -1,0 +1,332 @@
+package de.tudarmstadt.ukp.inception.workload.dynamic.annotation;
+
+import de.tudarmstadt.ukp.clarin.webanno.model.Project;
+import java.io.Serializable;
+import de.tudarmstadt.ukp.clarin.webanno.model.AnnotationDocumentStateChangeFlag;
+import de.tudarmstadt.ukp.clarin.webanno.model.AnnotationFeature;
+import de.tudarmstadt.ukp.clarin.webanno.model.AnnotationLayer;
+import de.tudarmstadt.ukp.clarin.webanno.model.MultiValueMode;
+
+import java.io.FileNotFoundException;
+import java.nio.file.Files;
+import java.io.FileInputStream;
+import java.util.Properties;
+import java.io.InputStream;
+import java.io.FileOutputStream;
+import de.tudarmstadt.ukp.inception.scheduling.Task;
+import org.apache.uima.cas.Feature;
+import org.apache.uima.cas.Type;
+import org.apache.uima.cas.CAS;
+import java.util.List;
+import java.util.Map;
+
+import src.main.gov.va.vha09.grecc.raptat.rn.uima.core.UIMARaptat;
+import src.main.gov.va.vha09.grecc.raptat.rn.uima.core.UIMARaptatTraining;
+
+import java.io.IOException;
+import src.main.gov.va.vha09.grecc.raptat.gg.core.training.TokenSequenceSolutionTrainer;
+import src.main.gov.va.vha09.grecc.raptat.gg.datastructures.annotationcomponents.SchemaConcept;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.uima.cas.text.AnnotationFS;
+import org.apache.uima.fit.util.CasUtil;
+import de.tudarmstadt.ukp.inception.recommendation.api.model.Recommender;
+import de.tudarmstadt.ukp.clarin.webanno.api.casstorage.CasAccessMode;
+import de.tudarmstadt.ukp.clarin.webanno.api.AnnotationSchemaService;
+import de.tudarmstadt.ukp.clarin.webanno.api.CasUpgradeMode;
+import de.tudarmstadt.ukp.clarin.webanno.model.AnnotationDocument;
+import src.main.gov.va.vha09.grecc.raptat.rn.misc.SilkAnnotation;
+import java.util.ArrayList;
+import de.tudarmstadt.ukp.clarin.webanno.model.AnnotationDocumentState;
+import java.io.PrintStream;
+import java.io.File;
+import src.main.gov.va.vha09.grecc.raptat.rn.misc.BridgeClass;
+import de.tudarmstadt.ukp.clarin.webanno.security.model.User;
+import de.tudarmstadt.ukp.clarin.webanno.model.SourceDocument;
+import de.tudarmstadt.ukp.clarin.webanno.model.Tag;
+
+import java.util.Optional;
+import org.apache.wicket.core.request.handler.IPartialPageRequestHandler;
+import org.apache.wicket.ajax.AjaxRequestTarget;
+import de.agilecoders.wicket.extensions.markup.html.bootstrap.icon.FontAwesome5IconType;
+import de.agilecoders.wicket.core.markup.html.bootstrap.behavior.CssClassNameModifier;
+import org.apache.wicket.model.LambdaModel;
+import org.apache.wicket.markup.html.basic.Label;
+import de.tudarmstadt.ukp.clarin.webanno.support.lambda.LambdaBehavior;
+import java.util.Objects;
+import org.apache.wicket.behavior.Behavior;
+import org.apache.wicket.model.IModel;
+import org.apache.wicket.model.StringResourceModel;
+import org.apache.wicket.Component;
+import de.tudarmstadt.ukp.inception.scheduling.SchedulingService;
+import de.tudarmstadt.ukp.inception.recommendation.api.RecommendationService;
+import de.tudarmstadt.ukp.inception.workload.dynamic.workflow.WorkflowExtensionPoint;
+import de.tudarmstadt.ukp.inception.workload.model.WorkloadManagementService;
+import javax.persistence.EntityManager;
+import de.tudarmstadt.ukp.inception.workload.dynamic.DynamicWorkloadExtension;
+import de.tudarmstadt.ukp.clarin.webanno.api.ProjectService;
+import org.apache.wicket.spring.injection.annot.SpringBean;
+import de.tudarmstadt.ukp.clarin.webanno.api.DocumentService;
+import de.tudarmstadt.ukp.clarin.webanno.support.lambda.LambdaAjaxLink;
+import de.tudarmstadt.ukp.clarin.webanno.api.annotation.adapter.TypeAdapter;
+import de.tudarmstadt.ukp.clarin.webanno.api.annotation.model.AnnotatorState;
+import de.tudarmstadt.ukp.clarin.webanno.support.dialog.ConfirmationDialog;
+import de.tudarmstadt.ukp.clarin.webanno.api.annotation.page.AnnotationPageBase;
+import de.tudarmstadt.ukp.clarin.webanno.api.annotation.rendering.Renderer;
+
+import org.apache.wicket.markup.html.panel.Panel;
+
+public class DynamicAnnotatorWorkflowActionBarItemGroup extends Panel
+{
+	private static final long serialVersionUID = 9215276761731631710L;
+	private AnnotationPageBase page;
+	protected ConfirmationDialog finishDocumentDialog;
+	final private  AnnotatorState annotatorState;
+	final private  LambdaAjaxLink finishDocumentLink;
+	@SpringBean
+	private DocumentService documentService;
+	@SpringBean
+	private ProjectService projectService;
+	@SpringBean
+	private DynamicWorkloadExtension dynamicWorkloadExtension;
+	@SpringBean
+	private EntityManager entityManager;
+	@SpringBean
+	private WorkloadManagementService workloadManagementService;
+	@SpringBean
+	private WorkflowExtensionPoint workflowExtensionPoint;
+	@SpringBean
+	private RecommendationService recommendationService;
+	@SpringBean
+	private SchedulingService scheduler;
+	@SpringBean
+	private AnnotationSchemaService annotationService;
+
+	public DynamicAnnotatorWorkflowActionBarItemGroup( String aId,  AnnotationPageBase aPage) {
+		super(aId);
+		this.page = aPage;
+		this.annotatorState = aPage.getModelObject();
+		this.add(new Component[] { (Component)(this.finishDocumentDialog = new ConfirmationDialog("finishDocumentDialog", (IModel)new StringResourceModel("FinishDocumentDialog.title", (Component)this, (IModel)null), (IModel)new StringResourceModel("FinishDocumentDialog.text", (Component)this, (IModel)null))) });
+		this.add(new Component[] { (Component)(this.finishDocumentLink = new LambdaAjaxLink("showFinishDocumentDialog", this::actionFinishDocument)) });
+		this.finishDocumentLink.setOutputMarkupId(true);
+		LambdaAjaxLink finishDocumentLink = this.finishDocumentLink;
+		Behavior[] array = { null };
+		int n = 0;
+		AnnotationPageBase page = this.page;
+		Objects.requireNonNull(page);
+		array[n] = LambdaBehavior.enabledWhen(page::isEditable);
+		finishDocumentLink.add(array);
+		this.finishDocumentLink.add(new Component[] { new Label("state").add(new Behavior[] { (Behavior)new CssClassNameModifier(LambdaModel.of(this::getStateClass)) }) });
+	}
+
+	protected AnnotationPageBase getAnnotationPage() {
+		return this.page;
+	}
+
+	public String getStateClass() {
+		return FontAwesome5IconType.check_circle_r.cssClassName();
+	}
+
+	protected void actionFinishDocument( AjaxRequestTarget aTarget) {
+		this.finishDocumentDialog.setConfirmAction(_target -> {
+			this.page.actionValidateDocument(_target, this.page.getEditorCas());
+			User user = this.annotatorState.getUser();
+			Project project = this.annotatorState.getProject();
+			SourceDocument document = this.annotatorState.getDocument();
+			AnnotationDocument annotationDocument = this.documentService.getAnnotationDocument(document, user);
+			this.documentService.setAnnotationDocumentState(annotationDocument, AnnotationDocumentState.FINISHED, new AnnotationDocumentStateChangeFlag[0]);
+			_target.add(new Component[] { (Component)this.page });
+			Optional<SourceDocument> nextDocument = this.dynamicWorkloadExtension.nextDocumentToAnnotate(project, user);
+			if (nextDocument.isPresent()) {
+				this.page.getModelObject().setDocument((SourceDocument)nextDocument.get(), this.documentService.listSourceDocuments(nextDocument.get().getProject()));
+				if (BridgeClass.numberDocumentsFinished != 0 && BridgeClass.numberDocumentsFinished % BridgeClass.numberDocumentsBeforeTrainingThreshold == 0) {
+					this.silkCAPreannotate(nextDocument, user);
+				}
+				BridgeClass.numberDocumentsFinished = this.documentService.listAnnotationDocumentsWithStateForUser(this.annotatorState.getProject(), user, AnnotationDocumentState.FINISHED).size();
+				this.page.actionLoadDocument(_target);
+			}
+			else {
+				this.page.getSession().info((Serializable)"There are no more documents to annotate available for you.");
+				this.page.setResponsePage(this.getAnnotationPage().getApplication().getHomePage());
+			}
+		});
+		this.finishDocumentDialog.show((IPartialPageRequestHandler)aTarget);
+	}
+
+	private void silkCAPreannotate( Optional<SourceDocument> nextDocument,  User user) throws IOException {
+		BridgeClass.userDirPath = "C:\\Users\\noriegrt";
+		//BridgeClass.userDirPath = "U:\\Workspaces\\Tomcat";
+		File file = new File(BridgeClass.userDirPath + "//uimaRaptatInception" + "//errorPrintStream.txt");
+		if (!file.exists())
+			file.createNewFile();
+		PrintStream ps = new PrintStream(BridgeClass.userDirPath + "//uimaRaptatInception" + "//errorPrintStream.txt");
+		System.setOut(ps);
+		System.setErr(ps);
+
+		BridgeClass.nextDocumentSourceFilePath = documentService.getSourceDocumentFile((SourceDocument) nextDocument.get()).getAbsolutePath();
+
+		BridgeClass.silkPredictions.clear();
+		BridgeClass.documentFinished = true;
+		BridgeClass.nextDocName = nextDocument.get().getName();
+		File solutionFile = new File(BridgeClass.userDirPath + "//uimaRaptatInception" + "//RaptatSolution_211002_202945.soln");
+		System.out.println(solutionFile.getAbsolutePath());
+		BridgeClass.solutionFilePath = solutionFile.getAbsolutePath();
+		//System.out.println(BridgeClass.solutionFilePath);
+		//FileUtils.deleteQuietly(solutionFile);
+		List<AnnotationDocument> listFinishedDocumentsForUser = (List<AnnotationDocument>) this.documentService.listAnnotationDocumentsWithStateForUser(this.annotatorState.getProject(), user, AnnotationDocumentState.FINISHED);
+		List<String> annotatedFinishedDocumentListFilePaths = new ArrayList<String>();
+		List<SilkAnnotation> annotations = new ArrayList<SilkAnnotation>();
+		for ( AnnotationDocument annotatedFinishedDocument : listFinishedDocumentsForUser) {
+			if (BridgeClass.totalAnnotatedDocumentFilePaths.contains(documentService.getDocumentFolder(annotatedFinishedDocument.getDocument()).getAbsolutePath() + "//" + annotatedFinishedDocument.getName())) {
+				continue;
+			}
+			annotatedFinishedDocumentListFilePaths.add(documentService.getDocumentFolder(annotatedFinishedDocument.getDocument()).getAbsolutePath() + "//" + annotatedFinishedDocument.getName());
+			CAS totalAnnotations = this.documentService.readAnnotationCas(annotatedFinishedDocument.getDocument(), user.getUsername(), CasUpgradeMode.AUTO_CAS_UPGRADE, CasAccessMode.SHARED_READ_ONLY_ACCESS);
+			List<Recommender> listEnabledRecommenders = (List<Recommender>) this.recommendationService.listEnabledRecommenders(this.annotatorState.getProject());
+			Recommender silkRecommender = null;
+			for ( Recommender enabledRecommender : listEnabledRecommenders) {
+				if (enabledRecommender.getName().contains("Silk Recommender")) {
+					silkRecommender = enabledRecommender;
+					if (BridgeClass.schemaConcepts.size() == 0)
+						createSchemaConcepts(silkRecommender);
+				}
+			}
+			Type annotationType = CasUtil.getType(totalAnnotations, silkRecommender.getLayer().getName());
+			Feature predictedFeature = annotationType.getFeatureByBaseName(silkRecommender.getFeature().getName());
+			for ( AnnotationFS ann : CasUtil.select(totalAnnotations, annotationType)) {
+				String label = ann.getFeatureValueAsString(predictedFeature);
+				if (StringUtils.isNotEmpty((CharSequence)label)) {
+					annotations.add(new SilkAnnotation(label, ann.getBegin(), ann.getEnd(), documentService.getDocumentFolder(annotatedFinishedDocument.getDocument()).getAbsolutePath() + "//" + annotatedFinishedDocument.getName()));
+				}
+			}
+		}
+		BridgeClass.annotatedDocumentAnnotations.clear();
+		BridgeClass.annotatedDocumentAnnotations.addAll(annotations);
+		BridgeClass.annotatedDocumentFilePaths.clear();
+		BridgeClass.annotatedDocumentFilePaths.addAll(annotatedFinishedDocumentListFilePaths);
+		//BridgeClass.annotatedDocumentAnnotations.removeAll(BridgeClass.totalAnnotatedDocumentAnnotations);
+		//BridgeClass.annotatedDocumentFilePaths.removeAll(BridgeClass.totalAnnotatedDocumentFilePaths);
+		BridgeClass.totalAnnotatedDocumentAnnotations.addAll(BridgeClass.annotatedDocumentAnnotations);
+		BridgeClass.totalAnnotatedDocumentFilePaths.addAll(BridgeClass.annotatedDocumentFilePaths);
+		System.out.println("training");
+		if (BridgeClass.documentFinished) {
+			System.out.println("actual training");
+			writeAdditionalResourcesFromJar();
+			createUsablePropertiesFile();
+			String[] trainingArguments = new String[] {"-p", BridgeClass.userDirPath + "//uimaRaptatInception" + "//miscResources" + "//silk.prop"};
+			synchronized (this) {
+				try {
+					TokenSequenceSolutionTrainer.parseAndTrainInception(trainingArguments);
+					//					UIMARaptatTraining.runRaptat(null);
+				}
+				catch (Exception e) {
+					e.printStackTrace();
+					Thread.currentThread().interrupt();
+				}
+				finally {
+					CAS silkCAS = null;
+					try {
+						silkCAS = this.documentService.readAnnotationCas((SourceDocument)nextDocument.get(), user.getUsername(), CasUpgradeMode.AUTO_CAS_UPGRADE, CasAccessMode.SHARED_READ_ONLY_ACCESS);
+					}
+					catch (IOException e2) {
+						e2.printStackTrace();
+					}
+					solutionFile = new File(BridgeClass.userDirPath + "//uimaRaptatInception" + "//RaptatSolution_211002_202945.soln");
+					System.out.println(solutionFile.getAbsolutePath());
+					BridgeClass.solutionFilePath = solutionFile.getAbsolutePath();
+					UIMARaptat.runRaptat(new String[0], silkCAS);
+
+					this.recommendationService.triggerPrediction(user.getUsername(), "DocumentFinishedEvent", (SourceDocument)nextDocument.get());
+					System.out.println("triggered predictions");
+					for (List<Task> listScheduledTasks = (List<Task>)this.scheduler.getScheduledAndRunningTasks(); listScheduledTasks.size() != 0; listScheduledTasks = (List<Task>)this.scheduler.getScheduledAndRunningTasks()) {
+						try {
+							Thread.sleep(100L);
+						}
+						catch (InterruptedException e3) {
+							e3.printStackTrace();
+							Thread.currentThread().interrupt();
+						}
+					}
+				}
+
+			}
+		}
+		BridgeClass.documentFinished = false;
+		System.out.println("loading page");
+	}
+
+	public static void writeAdditionalResourcesFromJar() {
+		File miscResourcesDirectoryTemp = new File(BridgeClass.userDirPath + "/uimaRaptatInception/" + "/miscResources/");
+		if (!miscResourcesDirectoryTemp.exists()) {
+			miscResourcesDirectoryTemp.mkdir();
+		}
+		String[] resourceNames = new String[] { "piSampleDictionary_170808.txt", "projectschema.xml", "TestDataForSolutionTraining_211002_v01.csv", "testingConcepts.txt", "TrainingForCreatingTestSolution_211002_v02.prop" };
+		for ( String resourceName : resourceNames) {
+			InputStream descrFileStream = UIMARaptat.class.getClassLoader().getResourceAsStream("src/main/resources/UIMARaptatInceptionTomcat/" + resourceName);
+			try {
+				byte[] descrFileByteArray = descrFileStream.readAllBytes();
+				File descrFileTemp = new File(miscResourcesDirectoryTemp.getAbsolutePath() + "/" + "silkCAInception" + resourceName);
+				if (!descrFileTemp.exists()) {
+					descrFileTemp.delete();
+				}
+				descrFileTemp.createNewFile();
+				FileOutputStream fileOutputStreamDescriptor = new FileOutputStream(descrFileTemp.getAbsolutePath());
+				fileOutputStreamDescriptor.write(descrFileByteArray);
+				fileOutputStreamDescriptor.flush();
+				fileOutputStreamDescriptor.close();
+			}
+			catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	private static void createUsablePropertiesFile() {
+		File propFile = new File(BridgeClass.userDirPath + "//uimaRaptatInception" + "//miscResources" + "//silkCAInceptionTrainingForCreatingTestSolution_211002_v02.prop");
+		Properties properties = new Properties();
+		try {
+			properties.load(new FileInputStream(propFile.getAbsolutePath()));
+			properties.setProperty("-r", "\"" + BridgeClass.userDirPath + "\\uimaRaptatInception" + "\\miscResources" + "\\silkCAInceptionTestDataForSolutionTraining_211002_v01.csv\"");
+			properties.setProperty("-s", "\"" + BridgeClass.userDirPath + "\\uimaRaptatInception" + "\\miscResources" + "\\silkCAInceptionprojectschema.xml\"");
+			properties.setProperty("-c", "\"" + BridgeClass.userDirPath + "\\uimaRaptatInception" + "\\miscResources" + "\\silkCAInceptiontestingConcepts.txt\"");
+			properties.setProperty("-d", "\"" + BridgeClass.userDirPath + "\\uimaRaptatInception" + "\\miscResources" + "\\silkCAInceptionpiSampleDictionary_170808.txt\"");
+			properties.store(new FileOutputStream(new File(BridgeClass.userDirPath + "//uimaRaptatInception" + "//miscResources" + "//silkCAProperties.prop")), "");
+			File silkPropFile = new File(BridgeClass.userDirPath + "//uimaRaptatInception" + "//miscResources" + "//silkCAProperties.prop");
+			String propFileContents = null;
+			propFileContents = Files.readString(silkPropFile.toPath());
+			propFileContents = propFileContents.replaceAll("=", " ");
+			String[] propFileContentsArray = propFileContents.split("\r\n");
+			PrintStream os = new PrintStream(BridgeClass.userDirPath + "//uimaRaptatInception" + "//miscResources" + "//silk.prop");
+			os.println(propFileContentsArray[4].replace("\\\\", "\\").replace("C\\:", "C:").replace("U\\:", "U:") + "\r\n");
+			os.println(propFileContentsArray[5].replace("\\\\", "\\").replace("C\\:", "C:").replace("U\\:", "U:") + "\r\n");
+			os.println(propFileContentsArray[3].replace("\\\\", "\\").replace("C\\:", "C:").replace("U\\:", "U:") + "\r\n");
+			os.println(propFileContentsArray[6].replace("\\\\", "\\").replace("C\\:", "C:").replace("U\\:", "U:") + "\r\n");
+			os.println(propFileContentsArray[7].replace("\\\\", "\\").replace("C\\:", "C:").replace("U\\:", "U:") + "\r\n");
+			os.println(propFileContentsArray[2].replace("\\\\", "\\").replace("C\\:", "C:").replace("U\\:", "U:") + "\r\n");
+			os.flush();
+			os.close();
+			propFile.delete();
+			silkPropFile.delete();
+		}
+		catch (FileNotFoundException e1) {
+			e1.printStackTrace();
+		}
+		catch (IOException e2) {
+			e2.printStackTrace();
+		}
+	}
+
+
+	private void createSchemaConcepts(Recommender silkRecommender) {
+		AnnotationLayer aLayer = silkRecommender.getLayer();
+		SchemaConcept concept = new SchemaConcept(aLayer.getName(), aLayer.getType().equals("relation"));
+		List<Tag> attributeTags = annotationService.listTags(silkRecommender.getFeature().getTagset());
+		List<String> attributes = new ArrayList<String>(); 
+		attributeTags.forEach(attribute -> {attributes.add(attribute.getName());});
+		concept.addAttributeValues(silkRecommender.getFeature().getName(), attributes);
+		BridgeClass.schemaConcepts.add(concept);
+	}
+
+
+
+}

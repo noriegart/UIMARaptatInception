@@ -1,0 +1,35 @@
+= Document metadata
+
+====
+CAUTION: Experimental feature. To use this functionality, you need to enable it first by adding `documentmetadata.enabled=true` to the `settings.properties` file (see the <<admin-guide.adoc#sect_settings_documentmetadata, Admin Guide>>).
+
+Curation of document metadata annotations is not possible. Import and export of document metadata
+annotations is only supported in the UIMA CAS formats, but not in WebAnno TSV.
+====
+
+Before being able to configure document-level annotations, you need to define an annotation layer of 
+type *Document metadata* on the project *Settings*, *Layers* tab. For this:
+
+* Go to *Settings -> Layers* and click the *Create* button
+* Enter a name for the annotation layer (e.g. `Author`) and set its type to *Document metadata*
+* Click *Save*
+* On the right side of the page, you can now configure features for this annotation layer by clicking *Create*
+* Again, choose a name and type for the feature e.g. `name` of type *Primitive: String*
+* Click *Save*
+
+On the annotation page, you can now:
+
+* Open the **Document Metadata sidebar** (the tags icon) and
+* Choose the newly created annotation layer in the dropdown.
+* Clicking the plus sign will add a new annotation whose feature you can fill in.
+
+image::metadata-sidebar.png[align="center"]
+
+== Singletons
+
+If you want to define a document metadata layer for which each document should have exactly one
+annotation, then you can mark the layer as a *singleton*. This means that in every document, an
+annotation of this type is automatically created when the annotator opens the document. It is
+immediately accessible via the document metadata sidebar - the annotator does not have to create
+it first. Also, the singleton annotation cannot be deleted.
+

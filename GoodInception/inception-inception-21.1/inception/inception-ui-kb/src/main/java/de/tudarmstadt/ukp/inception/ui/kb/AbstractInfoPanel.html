@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<!--
+  Licensed to the Technische Universität Darmstadt under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The Technische Universität Darmstadt 
+  licenses this file to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.
+   
+  http://www.apache.org/licenses/LICENSE-2.0
+  
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<html xmlns:wicket="http://wicket.apache.org">
+<body>
+  <wicket:panel>
+    <wicket:container wicket:id="content"></wicket:container>
+    <div wicket:id="confirmationDialog"></div>
+    <div wicket:id="createSubclass"></div>
+  </wicket:panel>
+  
+  <wicket:fragment wicket:id="viewMode">
+    <div class="kb-object-headline">
+      <div class="kb-object-headline-uilabel-wrapper">
+        <h2 wicket:id="uiLabel"></h2>
+      </div>
+      <div class="flex-h-container flex-gutter flex-only-internal-gutter">
+        <h5 class="flex-content m-0 align-self-center">
+          <span wicket:id="idtext" class="fas fa-info-circle"></span>
+          <span wicket:id="typeLabel" class="label label-default pull-down"></span>
+        </h5>
+        <button wicket:id="createSubclass" type="button" class="btn btn-primary btn">
+          <i class="fas fa-plus me-1"></i>
+          <wicket:container wicket:id="subclassLabel"/>
+        </button>
+        <button wicket:id="delete" type="button" class="btn btn-danger">
+          <i class="fas fa-trash me-1"></i>
+          <wicket:container wicket:id="label"/>
+        </button>
+      </div>
+    </div>
+    <div class="flex-content flex-v-container" wicket:id="statements"></div> 
+  </wicket:fragment>  
+  
+  <wicket:fragment wicket:id="editMode">
+    <div class="kb-object-headline">
+    
+      <!-- form for creating new properties/concepts/instances -->
+      <form wicket:id="form">
+        <div class="input-group input-group-lg">
+          <input wicket:id="name" class="flex-content form-control" />
+          <div class="input-group-btn">
+            <button wicket:id="create" type="submit" class="btn btn-success">
+              <i class="fas fa-plus me-1"></i>
+              <wicket:container wicket:id="label"></wicket:container>
+            </button>
+            <button wicket:id="cancel" type="button" class="btn btn-secondary">
+              <i class="fas fa-times me-1"></i>
+              <wicket:container wicket:id="label"></wicket:container>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </wicket:fragment>
+</body>
+</html>
